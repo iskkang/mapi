@@ -8,18 +8,18 @@ import logging
 from bs4 import BeautifulSoup
 
 app = FastAPI()
+
 # CORS 설정
 origins = [
     "http://localhost",
     "http://localhost:8000",
-    "https://mtlab.netlify.app/",
-    "https://mtlab.netlify.app/scfi" # 여기에 실제 배포 URL을 추가하세요
+    "https://mtlab.netlify.app",
+    "https://mtlab.netlify.app/scfi"  # 여기에 실제 배포 URL을 추가하세요
 ]
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,15 +48,14 @@ async def fetch_and_plot_scfi():
 async def fetch_and_plot_ports():
     url = "https://www.econdb.com/widgets/top-port-comparison/data/"
     response = requests.get(url)
-    if response.status_code == 200 {
+    if response.status_code == 200:
         data = response.json()
         series_data = data['plots'][0]['data']
         df = pd.DataFrame(series_data)
         fig = px.bar(df, x='name', y='value', title="Top Port Comparison (June 24 vs June 23)")
         return fig.to_dict()
-    } else {
+    else:
         return {"error": "Failed to retrieve port comparison data"}
-    }
 
 @app.get("/global_trade")
 async def fetch_and_plot_global_trade():
@@ -71,9 +70,8 @@ async def fetch_and_plot_global_trade():
         fig = px.bar(df, x=df.index, y=df.columns, title="Global exports (TEU by week)", labels={'x': 'Year', 'value': 'TEU'}, barmode='stack')
         fig.update_layout(xaxis=dict(tickmode='linear', tick0=0, dtick=52))
         return fig.to_dict()
-    } else {
+    else:
         return {"error": "Failed to retrieve global trade data"}
-    }
 
 @app.get("/news")
 async def fetch_news(category: str):
