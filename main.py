@@ -8,8 +8,11 @@ import logging
 from bs4 import BeautifulSoup
 
 app = FastAPI()
+# CORS 설정
 origins = [
-    "*"
+    "http://localhost",
+    "http://localhost:8000",
+    "https://mtlab.netlify.app/"  # 여기에 실제 배포 URL을 추가하세요
 ]
 
 # CORS 설정
