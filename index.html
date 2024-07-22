@@ -1,98 +1,106 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MTL Dashboard</title>
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <link href="style.css" rel="stylesheet">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-</head>
-<body>
-    <div class="container">
-        <h1 class="mt-5">MTL Dashboard</h1>
-        
-        <h2 class="mt-4">Timeline Graphs</h2>
-        <div class="row">
-            <div class="col-md-4">
-                <h3>SCFI</h3>
-                <div id="scfi_chart"></div>
-            </div>
-            <div class="col-md-4">
-                <h3>Port Comparison</h3>
-                <div id="ports_chart"></div>
-            </div>
-            <div class="col-md-4">
-                <h3>Global Trade</h3>
-                <div id="global_trade_chart"></div>
-            </div>
-        </div>
-        
-        <h2 class="mt-4">Latest News and Port Status</h2>
-        <div class="row">
-            <div class="col-md-4">
-                <h3>News</h3>
-                <form id="news-form">
-                    <div class="form-group">
-                        <label for="category">Select Category:</label>
-                        <select class="form-control" id="category">
-                            <option value="해상운임">해상운임</option>
-                            <option value="항공운임">항공운임</option>
-                            <option value="철도">철도</option>
-                            <option value="물류">물류</option>
-                            <option value="Shipping">Shipping</option>
-                        </select>
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="fetchNews()">Fetch News</button>
-                </form>
-                <div id="news_content" class="mt-3"></div>
-            </div>
-            <div class="col-md-8">
-                <h3>Port Status</h3>
-                <div id="port_status_chart"></div>
-            </div>
-        </div>
-    </div>
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import requests
+import logging
+from bs4 import BeautifulSoup
 
-    <script>
-        function fetchChart(endpoint, elementId, title) {
-            fetch(endpoint)
-                .then(response => response.json())
-                .then(data => {
-                    Plotly.newPlot(elementId, data, { title: title });
-                });
-        }
+app = FastAPI()
 
-        function fetchNews() {
-            const category = document.getElementById('category').value;
-            fetch(`/news?category=${category}`)
-                .then(response => response.json())
-                .then(data => {
-                    const newsContent = document.getElementById('news_content');
-                    newsContent.innerHTML = '';
-                    data.forEach(article => {
-                        const articleDiv = document.createElement('div');
-                        articleDiv.classList.add('card', 'mb-3');
-                        articleDiv.innerHTML = `
-                            <img src="${article.thumbnail || 'https://via.placeholder.com/300x150?text=No+Image'}" class="card-img-top" alt="${article.title}">
-                            <div class="card-body">
-                                <h5 class="card-title">${article.title}</h5>
-                                <p class="card-text">Source: ${article.source}</p>
-                                <p class="card-text">Date: ${article.date}</p>
-                                <a href="${article.link}" class="btn btn-primary" target="_blank">Read more</a>
-                            </div>
-                        `;
-                        newsContent.appendChild(articleDiv);
-                    });
-                });
-        }
+# CORS 설정
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "https://mtlab.netlify.app",
+    "https://mtlab.netlify.app/scfi"  # 여기에 실제 배포 URL을 추가하세요
+]
 
-        document.addEventListener('DOMContentLoaded', function() {
-            fetchChart('/scfi', 'scfi_chart', 'Shanghai Containerized Freight Index (SCFI)');
-            fetchChart('/ports', 'ports_chart', 'Top Port Comparison (June 24 vs June 23)');
-            fetchChart('/global_trade', 'global_trade_chart', 'Global exports (TEU by week)');
-            fetchChart('/ports', 'port_status_chart', 'Port Status');
-        });
-    </script>
-</body>
-</html>
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logging.basicConfig(level=logging.DEBUG)
+
+@app.get("/scfi")
+async def fetch_and_plot_scfi():
+    url = "https://www.econdb.com/widgets/shanghai-containerized-index/data/"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        series_data = data['plots'][0]['data']
+        df = pd.DataFrame(series_data)
+        df['Date'] = pd.to_datetime(df['Date'])
+        fig = go.Figure()
+        for column in df.columns:
+            if column != 'Date':
+                fig.add_trace(go.Scatter(x=df['Date'], y=df[column], mode='lines+markers', name=column))
+        return fig.to_dict()
+    else:
+        return {"error": "Failed to retrieve SCFI data"}
+
+@app.get("/ports")
+async def fetch_and_plot_ports():
+    url = "https://www.econdb.com/widgets/top-port-comparison/data/"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        series_data = data['plots'][0]['data']
+        df = pd.DataFrame(series_data)
+        fig = px.bar(df, x='name', y='value', title="Top Port Comparison (June 24 vs June 23)")
+        return fig.to_dict()
+    else:
+        return {"error": "Failed to retrieve port comparison data"}
+
+@app.get("/global_trade")
+async def fetch_and_plot_global_trade():
+    url = "https://www.econdb.com/widgets/global-trade/data/?type=export&net=0&transform=0"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        series_data = data['plots'][0]['data']
+        df = pd.DataFrame(series_data)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.set_index('Date', inplace=True)
+        fig = px.bar(df, x=df.index, y=df.columns, title="Global exports (TEU by week)", labels={'x': 'Year', 'value': 'TEU'}, barmode='stack')
+        fig.update_layout(xaxis=dict(tickmode='linear', tick0=0, dtick=52))
+        return fig.to_dict()
+    else:
+        return {"error": "Failed to retrieve global trade data"}
+
+@app.get("/news")
+async def fetch_news(category: str):
+    url = f"https://news.google.com/search?q={category}&hl=ko&gl=KR&ceid=KR:ko"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    articles = soup.find_all('article')
+
+    news = []
+    for article in articles:
+        source = article.find('div', class_='vr1PYe').text if article.find('div', class_='vr1PYe') else 'No Source'
+        title_tag = article.find('a', class_='JtKRv')
+        title = title_tag.text if title_tag else 'No Title'
+        link = 'https://news.google.com' + title_tag['href'][1:] if title_tag else 'No Link'
+        thumbnail_tag = article.find('img', class_='Quavad')
+        if thumbnail_tag:
+            thumbnail = thumbnail_tag['src']
+            if thumbnail.startswith('/'):
+                thumbnail = 'https://news.google.com' + thumbnail
+        else:
+            thumbnail = None
+        date_tag = article.find('time', class_='hvbAAd')
+        date = date_tag['datetime'] if date_tag else None
+        news.append({
+            'source': source,
+            'title': title,
+            'link': link,
+            'thumbnail': thumbnail,
+            'date': date
+        })
+
+    return news
