@@ -8,6 +8,9 @@ import logging
 from bs4 import BeautifulSoup
 
 app = FastAPI()
+origins = [
+    "*"
+]
 
 # CORS 설정
 app.add_middleware(
