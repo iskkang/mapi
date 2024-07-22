@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -26,6 +27,9 @@ app.add_middleware(
 )
 
 logging.basicConfig(level=logging.DEBUG)
+
+# Serve static files
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.get("/scfi")
 async def fetch_and_plot_scfi():
@@ -87,7 +91,7 @@ async def fetch_news(category: str):
         title = title_tag.text if title_tag else 'No Title'
         link = 'https://news.google.com' + title_tag['href'][1:] if title_tag else 'No Link'
         thumbnail_tag = article.find('img', class_='Quavad')
-        if thumbnail_tag:
+        if (thumbnail_tag and 'src' in thumbnail_tag.attrs):
             thumbnail = thumbnail_tag['src']
             if thumbnail.startswith('/'):
                 thumbnail = 'https://news.google.com' + thumbnail
