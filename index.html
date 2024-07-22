@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTL Dashboard</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-5">MTL Dashboard</h1>
+        
+        <h2 class="mt-4">Timeline Graphs</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <h3>SCFI</h3>
+                <div id="scfi_chart"></div>
+            </div>
+            <div class="col-md-4">
+                <h3>Port Comparison</h3>
+                <div id="ports_chart"></div>
+            </div>
+            <div class="col-md-4">
+                <h3>Global Trade</h3>
+                <div id="global_trade_chart"></div>
+            </div>
+        </div>
+        
+        <h2 class="mt-4">Latest News and Port Status</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <h3>News</h3>
+                <form id="news-form">
+                    <div class="form-group">
+                        <label for="category">Select Category:</label>
+                        <select class="form-control" id="category">
+                            <option value="해상운임">해상운임</option>
+                            <option value="항공운임">항공운임</option>
+                            <option value="철도">철도</option>
+                            <option value="물류">물류</option>
+                            <option value="Shipping">Shipping</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="fetchNews()">Fetch News</button>
+                </form>
+                <div id="news_content" class="mt-3"></div>
+            </div>
+            <div class="col-md-8">
+                <h3>Port Status</h3>
+                <div id="port_status_chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function fetchChart(endpoint, elementId, title) {
+            fetch(endpoint)
+                .then(response => response.json())
+                .then(data => {
+                    Plotly.newPlot(elementId, data, { title: title });
+                });
+        }
+
+        function fetchNews() {
+            const category = document.getElementById('category').value;
+            fetch(`/news?category=${category}`)
+                .then(response => response.json())
+                .then(data => {
+                    const newsContent = document.getElementById('news_content');
+                    newsContent.innerHTML = '';
+                    data.forEach(article => {
+                        const articleDiv = document.createElement('div');
+                        articleDiv.classList.add('card', 'mb-3');
+                        articleDiv.innerHTML = `
+                            <img src="${article.thumbnail || 'https://via.placeholder.com/300x150?text=No+Image'}" class="card-img-top" alt="${article.title}">
+                            <div class="card-body">
+                                <h5 class="card-title">${article.title}</h5>
+                                <p class="card-text">Source: ${article.source}</p>
+                                <p class="card-text">Date: ${article.date}</p>
+                                <a href="${article.link}" class="btn btn-primary" target="_blank">Read more</a>
+                            </div>
+                        `;
+                        newsContent.appendChild(articleDiv);
+                    });
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchChart('/scfi', 'scfi_chart', 'Shanghai Containerized Freight Index (SCFI)');
+            fetchChart('/ports', 'ports_chart', 'Top Port Comparison (June 24 vs June 23)');
+            fetchChart('/global_trade', 'global_trade_chart', 'Global exports (TEU by week)');
+            fetchChart('/ports', 'port_status_chart', 'Port Status');
+        });
+    </script>
+</body>
+</html>
